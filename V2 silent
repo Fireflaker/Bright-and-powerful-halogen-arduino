@@ -1,0 +1,307 @@
+//8, 12, 13 RGB.
+//https://github.com/BretStateham/RGBLED
+
+//My variables
+
+
+#include <RGBLED.h>
+RGBLED led(8, 12, 13, COMMON_CATHODE);
+
+int delayspeed = 666;
+int buttonSwitchCase = 0;
+
+//end my varables
+
+const int CHANNELS = 6;
+const int LIGHT_PINS[CHANNELS] = {3, 5, 6, 9, 10, 11};
+const int LED_PINS[CHANNELS] = {8, 12, 13};
+
+
+int MIN_BRIGHTNESS[CHANNELS] = {0, 0, 0, 0, 0, 0};
+int MAX_BRIGHTNESS[CHANNELS] = {100, 255, 100, 255, 100, 255};
+int CurrentBrightness[CHANNELS] = {0, 0, 0, 0, 0, 0};
+int FadeAmount[CHANNELS] = {1, 1, 1, 1, 1, 1};
+
+//settings
+int case1Brightness[CHANNELS] = {1, 42, 85, 127, 170, 213}; // do not simplify or complain array rewrite
+int case1FadeAmount[CHANNELS] = {1, 1, 1, 1, 1, 1};
+int case1MIN_BRIGHTNESS[CHANNELS] = {0, 0, 0, 0, 0, 0};
+int case1MAX_BRIGHTNESS[CHANNELS] = {255, 255, 255, 255, 255, 255};
+
+int case2Brightness[CHANNELS] = {101, 120, 140, 160, 180, 200};
+int case2FadeAmount[CHANNELS] = {1, 1, 1, 1, 1, 1};
+int case2MIN_BRIGHTNESS[CHANNELS] = {100, 100, 100, 100, 100, 100};
+int case2MAX_BRIGHTNESS[CHANNELS] = {255, 255, 255, 255, 255, 255};
+
+int case3Brightness[CHANNELS] = {0, 10, 20, 30, 40, 50};
+int case3FadeAmount[CHANNELS] = {1, 1, 1, 1, 1, 1};
+int case3MIN_BRIGHTNESS[CHANNELS] = {0, 0, 0, 0, 0, 0};
+int case3MAX_BRIGHTNESS[CHANNELS] = {55, 55, 55, 55, 55, 55};
+
+int case4Brightness[CHANNELS] = {140, 110, 90, 66, 150, 99};
+int case4FadeAmount[CHANNELS] = {3, 2, 5, 2, 5, 4};
+int case4MIN_BRIGHTNESS[CHANNELS] = {80, 60, 80, 60, 60, 80};
+int case4MAX_BRIGHTNESS[CHANNELS] = {255, 255, 255, 255, 255, 255};
+
+int case5Brightness[CHANNELS] = {0, 0, 0, 0, 0, 0};
+int case5FadeAmount[CHANNELS] = {0, 0, 0, 0, 0, 0};
+int case5MIN_BRIGHTNESS[CHANNELS] = {0, 0, 0, 0, 0, 0};
+int case5MAX_BRIGHTNESS[CHANNELS] = {0, 0, 0, 0, 0, 0};
+
+
+//handel rotory start
+#include <Arduino.h>
+#include <RotaryEncoder.h>
+
+#if defined(ARDUINO_AVR_UNO) || defined(ARDUINO_AVR_NANO_EVERY)
+// Example for Arduino UNO with input signals on pin 2 and 3
+#define PIN_IN1 4
+#define PIN_IN2 2
+
+#endif
+
+// Setup a RotaryEncoder with 4 steps per latch for the 2 signal input pins:
+// RotaryEncoder encoder(PIN_IN1, PIN_IN2, RotaryEncoder::LatchMode::FOUR3);
+
+// Setup a RotaryEncoder with 2 steps per latch for the 2 signal input pins:
+RotaryEncoder encoder(PIN_IN1, PIN_IN2, RotaryEncoder::LatchMode::TWO03);
+
+// Define some constants.
+
+// the maximum acceleration is 10 times.
+constexpr float m = 10;
+
+// at 200ms or slower, there should be no acceleration. (factor 1)
+constexpr float longCutoff = 50;
+
+// at 5 ms, we want to have maximum acceleration (factor m)
+constexpr float shortCutoff = 5;
+
+// To derive the calc. constants, compute as follows:
+// On an x(ms) - y(factor) plane resolve a linear formular factor(ms) = a * ms + b;
+// where f(4)=10 and f(200)=1
+
+constexpr float a = (m - 1) / (shortCutoff - longCutoff);
+constexpr float b = 1 - longCutoff * a;
+
+// a global variables to hold the last position
+static int lastPos = 0;
+
+//handel rotory end
+
+
+//Handle button
+// constants won't change. They're used here to set pin numbers:
+
+#include <ezButton.h>
+
+ezButton button(7);  // create ezButton object that attach to pin 7;
+
+//end button
+
+
+// the setup routine runs once when you press reset:
+void setup() {
+
+    TCCR1B = TCCR1B & B11111000 | B00000001; // set timer 1 divisor to 1 for PWM frequency of 31372.55 Hz
+    TCCR0B = TCCR0B & B11111000 | B00000001; // for PWM frequency of 62500.00 Hz
+    TCCR2B = TCCR2B & B11111000 | B00000001; // for PWM frequency of 31372.55 Hz
+
+  //Serial.println("Setup first line");
+
+  button.setDebounceTime(50); // set debounce time to 50 milliseconds
+
+
+  for (int i = 0; i < CHANNELS; i++) {
+    pinMode(LIGHT_PINS[i], OUTPUT);
+  }
+  for (int i = 0; i < 3; i++) {
+    pinMode(LED_PINS[i], OUTPUT);
+  }
+
+  pinMode(2, INPUT_PULLUP);
+  pinMode(3, INPUT_PULLUP);
+  pinMode(7, INPUT_PULLUP); //button
+
+
+  //rotory encoder
+  Serial.begin(115200);
+  while (!Serial);
+
+  Serial.println("AcceleratedRotator example for the RotaryEncoder library.");
+  Serial.print("a=");
+  Serial.println(a);
+  Serial.print("b=");
+  Serial.println(b);
+
+
+  //button
+  pinMode(7, INPUT_PULLUP);
+
+}
+
+// the loop routine runs over and over again forever:
+void loop() {
+
+
+
+  //Serial.println("Loop first line");
+  button.loop(); // MUST call the loop() function first
+  //
+  //  //  setting of each buttonSwitchCase start
+  //  switch (buttonSwitchCase) {
+  //
+  //    default:
+  //      break;
+  //  }
+
+  //button
+
+
+  if (button.isPressed()) {
+    buttonSwitchCase++;
+    Serial.print("buttonSwitchCase Var==");
+    Serial.print(buttonSwitchCase);
+    Serial.println("     The button is pressed");
+    if (buttonSwitchCase == 1) {
+      Serial.println("Setting buttonSwitchCase == 1......");
+      led.writeRGB(0, 0, 255);
+      for (int i = 0; i < CHANNELS; i++)
+      {
+        CurrentBrightness[i] = case1Brightness[i];
+        FadeAmount[i] = case1FadeAmount[i];
+        MIN_BRIGHTNESS[i] = case1MIN_BRIGHTNESS[i];
+        MAX_BRIGHTNESS[i] = case1MAX_BRIGHTNESS[i];
+        Serial.println(CurrentBrightness[i]);
+      }
+    }
+    else if (buttonSwitchCase == 2) {
+      Serial.println("Setting buttonSwitchCase == 2......");
+      led.writeRGB(255, 0, 0);
+      for (int i = 0; i < CHANNELS; i++)
+      {
+        CurrentBrightness[i] = case2Brightness[i];
+        FadeAmount[i] = case2FadeAmount[i];
+        MIN_BRIGHTNESS[i] = case2MIN_BRIGHTNESS[i];
+        MAX_BRIGHTNESS[i] = case2MAX_BRIGHTNESS[i];
+        Serial.println(CurrentBrightness[i]);
+      }
+    }
+    else if (buttonSwitchCase == 3) {
+      Serial.println("Setting buttonSwitchCase == 3......");
+      led.writeRGB(0, 255, 0);
+      for (int i = 0; i < CHANNELS; i++)
+      {
+        CurrentBrightness[i] = case3Brightness[i];
+        FadeAmount[i] = case3FadeAmount[i];
+        MIN_BRIGHTNESS[i] = case3MIN_BRIGHTNESS[i];
+        MAX_BRIGHTNESS[i] = case3MAX_BRIGHTNESS[i];
+        Serial.println(CurrentBrightness[i]);
+      }
+    }
+    else if (buttonSwitchCase == 4) {
+      Serial.println("Setting buttonSwitchCase == 4......");
+      led.writeRGB(255, 0, 255);
+      for (int i = 0; i < CHANNELS; i++)
+      {
+        CurrentBrightness[i] = case4Brightness[i];
+        FadeAmount[i] = case4FadeAmount[i];
+        MIN_BRIGHTNESS[i] = case4MIN_BRIGHTNESS[i];
+        MAX_BRIGHTNESS[i] = case4MAX_BRIGHTNESS[i];
+        Serial.println(CurrentBrightness[i]);
+      }
+    }
+    else if (buttonSwitchCase == 5) {
+      led.writeRGB(255, 255, 0);
+      Serial.println("Setting buttonSwitchCase == 5......");
+      for (int i = 0; i < CHANNELS; i++)
+      {
+        CurrentBrightness[i] = case5Brightness[i];
+        FadeAmount[i] = case5FadeAmount[i];
+        MIN_BRIGHTNESS[i] = case5MIN_BRIGHTNESS[i];
+        MAX_BRIGHTNESS[i] = case5MAX_BRIGHTNESS[i];
+        Serial.println(CurrentBrightness[i]);
+      }
+    }
+  }
+
+
+
+  if (button.isReleased()) {
+    Serial.print("buttonSwitchCase Var==");
+    Serial.print(buttonSwitchCase);
+    Serial.println("     The button is released");
+    if (buttonSwitchCase >= 6) {
+      buttonSwitchCase = 0;
+    }
+  }
+  //button end
+
+
+
+
+
+  //display the values on halogen
+  for (int i = 0; i < CHANNELS; i++) { // this for loop block updates halogens
+
+    if (buttonSwitchCase == 123) {
+      int MIN_BRIGHTNESS[CHANNELS] = {0, 0, 0, 0, 0, 0};
+      int MAX_BRIGHTNESS[CHANNELS] = {255, 255, 255, 255, 255, 255};
+      int CurrentBrightness[CHANNELS] = {0, 0, 0, 120, 120, 120};
+      int FadeAmount[CHANNELS] = {1, 1, 1, 1, 1, 1};
+      buttonSwitchCase = 0;
+    }
+    analogWrite(LIGHT_PINS[i], CurrentBrightness[i]);
+    CurrentBrightness[i] += FadeAmount[i];
+
+    // reverse the direction of the fading at the ends of the fade:
+    if (CurrentBrightness[i] <= MIN_BRIGHTNESS[i] ||
+        CurrentBrightness[i] >= MAX_BRIGHTNESS[i]) {
+      FadeAmount[i] = -FadeAmount[i];
+    }
+  }
+
+  // wait for 90 milliseconds to see the dimming effect
+  delayMicroseconds(delayspeed);
+
+
+
+  //enoder
+  encoder.tick();
+
+  int newPos = encoder.getPosition();
+  if (lastPos != newPos) {
+
+    // accelerate when there was a previous rotation in the same direction.
+
+    unsigned long ms = encoder.getMillisBetweenRotations();
+
+    if (ms < longCutoff) {
+      // do some acceleration using factors a and b
+
+      // limit to maximum acceleration
+      if (ms < shortCutoff) {
+        ms = shortCutoff;
+      }
+
+      float ticksActual_float = a * ms + b;
+      Serial.print(" f= ");
+      Serial.println(ticksActual_float);
+
+      long deltaTicks = (long)ticksActual_float * (newPos - lastPos);
+      Serial.print(" d= ");
+      Serial.println(deltaTicks);
+
+      newPos = newPos + deltaTicks;
+      encoder.setPosition(newPos);
+    }
+
+    Serial.print(newPos);
+    Serial.print(" ms: ");
+    Serial.println(ms);
+    lastPos = newPos;
+  } // if
+
+  delayspeed = newPos + 1000;
+
+}
